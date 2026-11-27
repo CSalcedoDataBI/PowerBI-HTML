@@ -4,7 +4,7 @@
   "artifacts": [
     {
       "report": {
-        "path": "Contoso-Retail.Report"
+        "path": "Embudo_Clientes.Report"
       }
     }
   ],

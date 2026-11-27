@@ -14,7 +14,7 @@ Ficha y vista previa: <https://csalcedodatabi.com/recursos/galeria-html/embudo-c
 ## Abre y pinta
 
 El informe usa **Contoso-Retail** (2023–2024), el modelo maestro de la galería, con los datos de
-[SampleDataSets](https://github.com/CSalcedoDataBI/SampleDataSets) (MIT) leídos por internet. Descomprimes, abres `pbip/Contoso-Retail.pbip` en Power BI Desktop,
+[SampleDataSets](https://github.com/CSalcedoDataBI/SampleDataSets) (MIT) leídos por internet. Descomprimes, abres `pbip/Embudo_Clientes.pbip` en Power BI Desktop,
 pulsas **Actualizar** la primera vez y el visual está en la página **«Embudo de clientes»**,
 filtrada al año 2024.
 
