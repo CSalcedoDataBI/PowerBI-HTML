@@ -31,7 +31,7 @@ Nombre_Del_Visual/
 Haz clic en una imagen para abrir su carpeta: README, medida DAX y PBIP.
 
 <table>
-<tr><td align="center" width="50%"><a href="Embudo_Clientes/"><img src="Embudo_Clientes/card.png" width="100%" alt="Embudo de clientes"></a><br><b><a href="Embudo_Clientes/">Embudo de clientes</a></b></td><td width="50%"></td></tr>
+<tr><td align="center" width="50%"><a href="Embudo_Clientes/"><img src="Embudo_Clientes/card.png" width="100%" alt="Embudo de clientes"></a><br><b><a href="Embudo_Clientes/">Embudo de clientes</a></b></td><td align="center" width="50%"><a href="Calendario_Ventas/"><img src="Calendario_Ventas/card.png" width="100%" alt="Calendario de ventas"></a><br><b><a href="Calendario_Ventas/">Calendario de ventas</a></b></td></tr>
 </table>
 
 ## Licencia

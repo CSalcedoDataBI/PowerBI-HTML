@@ -1,0 +1,41 @@
+-- The HTML: put this measure in an HTML Content visual. Needs a date table with Month (1-12), DayOfWeek (0 = Monday) and DayName, and a sales measure.
+'HTML Calendar Month Weekday' =
+VAR _cells =
+    ADDCOLUMNS (
+        CROSSJOIN ( VALUES ( 'DimDate'[Month] ), VALUES ( 'DimDate'[DayOfWeek] ) ),
+        "@v", [Total Sales] + 0
+    )
+VAR _max = MAXX ( _cells, [@v] )
+VAR _months = ADDCOLUMNS ( VALUES ( 'DimDate'[Month] ), "@m", [Total Sales] + 0 )
+VAR _days = SUMMARIZE ( ALL ( 'DimDate' ), 'DimDate'[DayOfWeek], 'DimDate'[DayName] )
+VAR _mmax = MAXX ( _months, [@m] )
+VAR _year = SELECTEDVALUE ( 'DimDate'[Year] )
+RETURN
+    "<div style=""font-family:'Segoe UI',sans-serif;color:#334155;width:100%;height:100%;display:flex;flex-direction:column""> "
+        & "<div style=""font-size:15px;font-weight:600;color:#1F3A5F;margin:2px 0 2px 4px"">Sales by month and weekday" & IF ( ISBLANK ( _year ), "", " · " & _year ) & "</div> "
+        & "<div style=""font-size:11px;color:#64748B;margin:0 0 6px 4px"">Darker = more sales · outlined = best cell · bars on top = month totals</div> "
+        & "<svg viewBox=""0 0 1000 560"" preserveAspectRatio=""xMidYMid meet"" style=""flex:1;width:100%""> "
+        & CONCATENATEX (
+            _months,
+            "<rect x=""" & ROUND ( 90 + ( 'DimDate'[Month] - 1 ) * 74 + 6, 0 ) & """ y=""" & ROUND ( 96 - DIVIDE ( [@m], _mmax ) * 60, 0 ) & """ width=""62"" height=""" & ROUND ( DIVIDE ( [@m], _mmax ) * 60, 0 ) & """ rx=""3"" fill=""#9FB7D4""><title>" & FORMAT ( DATE ( 2000, 'DimDate'[Month], 1 ), "MMMM", "en-US" ) & ": " & FORMAT ( [@m], "$#,0", "en-US" ) & "</title></rect> "
+                & "<text x=""" & ROUND ( 90 + ( 'DimDate'[Month] - 1 ) * 74 + 37, 0 ) & """ y=""" & ROUND ( 90 - DIVIDE ( [@m], _mmax ) * 60, 0 ) & """ text-anchor=""middle"" font-size=""11"" fill=""#334155"">" & FORMAT ( [@m] / 1000000, "$#,0.0", "en-US" ) & "M</text> "
+                & "<text x=""" & ROUND ( 90 + ( 'DimDate'[Month] - 1 ) * 74 + 37, 0 ) & """ y=""118"" text-anchor=""middle"" font-size=""12"" font-weight=""600"" fill=""#334155"">" & FORMAT ( DATE ( 2000, 'DimDate'[Month], 1 ), "MMM", "en-US" ) & "</text>",
+            "",
+            'DimDate'[Month], ASC
+        ) & " "
+        & CONCATENATEX (
+            _days,
+            "<text x=""80"" y=""" & ROUND ( 130 + 'DimDate'[DayOfWeek] * 60 + 36, 0 ) & """ text-anchor=""end"" font-size=""12"" fill=""#64748B"">" & LEFT ( 'DimDate'[DayName], 3 ) & "</text>",
+            "",
+            'DimDate'[DayOfWeek], ASC
+        ) & " "
+        & CONCATENATEX (
+            _cells,
+            "<rect x=""" & ROUND ( 90 + ( 'DimDate'[Month] - 1 ) * 74 + 3, 0 ) & """ y=""" & ROUND ( 130 + 'DimDate'[DayOfWeek] * 60 + 3, 0 ) & """ width=""68"" height=""54"" rx=""5"" fill=""#1F3A5F"" fill-opacity=""" & FORMAT ( 0.06 + 0.94 * DIVIDE ( [@v], _max ), "0.00", "en-US" ) & """ stroke=""" & IF ( [@v] = _max, "#E4572E", "none" ) & """ stroke-width=""3""><title>" & FORMAT ( DATE ( 2000, 'DimDate'[Month], 1 ), "MMM", "en-US" ) & ", weekday " & ( 'DimDate'[DayOfWeek] + 1 ) & ": " & FORMAT ( [@v], "$#,0", "en-US" ) & "</title></rect>",
+            "",
+            'DimDate'[Month], ASC,
+            'DimDate'[DayOfWeek], ASC
+        ) & " "
+        & "</svg> "
+        & "</div>"
+
