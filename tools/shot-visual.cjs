@@ -20,7 +20,7 @@ async function absBox(fr, r) {
   const [cdp, text, out, scale] = process.argv.slice(3);
   const b = await chromium.connectOverCDP(cdp);
   for (const ctx of b.contexts()) for (const pg of ctx.pages()) for (const fr of pg.frames()) {
-    const el = await fr.$(`xpath=//*[contains(text(), ${JSON.stringify(text)})]/..`).catch(() => null);
+    const el = await fr.$(text.startsWith("css=") ? text : `xpath=//*[contains(text(), ${JSON.stringify(text)})]/..`).catch(() => null);
     if (!el) continue;
     const r0 = await el.evaluate(e => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; });
     if (r0.width < 100) continue;

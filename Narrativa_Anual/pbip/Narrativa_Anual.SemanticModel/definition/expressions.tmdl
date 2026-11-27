@@ -1,0 +1,198 @@
+/// Base raw URL of the Contoso Retail Parquet files, hosted in the PUBLIC SampleDataSets repo
+/// (github.com/CSalcedoDataBI/SampleDataSets → contoso-retail/). Hosting the data there lets THIS
+/// reference repo stay private while the model still refreshes for ANYONE over raw.githubusercontent
+/// — no auth, no SQL Server, no local paths. A real M PARAMETER (IsParameterQuery) so every partition
+/// stays firewall-safe. To use a fork, branch, tag or a local mirror, change this single value
+/// (a folder URL, without a trailing slash).
+expression DataBaseUrl = "https://raw.githubusercontent.com/CSalcedoDataBI/SampleDataSets/main/contoso-retail" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: b0000000-0000-0000-0000-0000000000d0
+
+	annotation PBI_ResultType = Text
+
+/// FactSales.parquet as it comes. Not loaded: the FactSales table, the calendar marks and the customer segment read it, so the fact is described once.
+expression FactSalesSource =
+		let
+		    Source = Parquet.Document(Binary.Buffer(Web.Contents(DataBaseUrl, [RelativePath = "FactSales.parquet"])))
+		in
+		    Source
+	lineageTag: b0d4234d-16bb-516c-a204-4414a6ca17db
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
+/// Last order date in the sales. Not loaded: the calendar marks (DateWithTransactions, Is Complete Month) compare each day with it.
+expression LastOrderDate =
+		let
+		    Source = Date.FromText(List.Max(FactSalesSource[OrderDate]), [Format = "yyyy-MM-dd", Culture = "en-US"])
+		in
+		    Source
+	lineageTag: 9e73d6b9-167b-520d-8951-9778ada19672
+
+	annotation PBI_ResultType = Date
+
+/// VEDAFXChangeType of Power-Query-Scripts (functions/cleaning-transform/VEDAFXChangeType.pq), verbatim: types the columns it finds and ignores the ones it does not. DimStore and DimCustomer type their dates with it. Not loaded.
+expression VEDAFXChangeType =
+		let
+		    ChangeTypefx = (Table as table, DataTypes as list) as table => 
+		    let
+		        SourceCols = Table.ColumnNames(Table),
+		        DataTypesColumnList = List.Transform(DataTypes, each _{0}),
+		        MatchingCols = List.Intersect({SourceCols, DataTypesColumnList}),
+		        MatchingTypesRestoredasList = 
+		            List.Transform(
+		                List.Transform(
+		                    MatchingCols, 
+		                    each List.PositionOf(DataTypesColumnList, _)
+		                ), 
+		            each DataTypes{_}
+		        ),
+		        Custom2 = Table.TransformColumnTypes(Table, MatchingTypesRestoredasList)
+		    in
+		        Custom2,
+		        Docs = [
+		                Documentation.Name = "ChangeTypeFxNoErrors",
+		                Documentation.Description = "Returns no error if the data types applied are not found.",
+		                Documentation.Author = "Chandeep Chhabra @ goodly.co.in",
+		                Documentation.Examples = 
+		                    {
+		                        [
+		                            Description = "There are 2 arguments to this function. Table, DataTypes as List of List", 
+		                            Code = 
+		    "ChangeTypeNoErrors (
+		        Source,                     -- Table Name 
+		        { {Date, type date}, 
+		        {Region, type text}, 
+		        {Units, Int64.Type} }       -- Data types applied to columns
+		    )
+		    ",
+		                            Result = "Table with no errors"
+		                        ]
+		                    }
+		            ]
+		    in
+		    Value.ReplaceType(ChangeTypefx, Value.ReplaceMetadata(Value.Type(ChangeTypefx), Docs))
+	lineageTag: 3f1d6a52-7c1e-4d8a-9b3e-5a0c2d7e9f11
+
+	annotation PBI_ResultType = Function
+
+/// CSalcedoCalendar, by Cristóbal Salcedo · CSalcedoDataBI: a date table, one row per day between two dates. DimDate calls it. Select it in Transform data to read its help and try it with your own dates.
+expression CSalcedoCalendar =
+		let
+		    CSalcedoCalendar = (
+		        StartDate as date,
+		        EndDate as date,
+		        optional Culture as nullable text,
+		        optional WeekStart as nullable text,
+		        optional QuarterLabel as nullable text,
+		        optional FiscalStartMonth as nullable number,
+		        optional FullYears as nullable logical
+		    ) as table =>
+		    let
+		        Lang = if Culture = null then "en-US" else Culture,
+		        FirstDayName = if WeekStart = null then "Monday" else WeekStart,
+		        QLabel = if QuarterLabel = null then "Q" else QuarterLabel,
+		        FiscalStart = if FiscalStartMonth = null then 1 else FiscalStartMonth,
+		        WholeYears = if FullYears = null then true else FullYears,
+		        // Month and day names by culture, written out so every version of Power BI gives the same text
+		        NamesByCulture = [
+		            #"en-US" = [
+		                Months = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"},
+		                MonthsShort = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+		                Days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}],
+		            #"es-ES" = [
+		                Months = {"enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"},
+		                MonthsShort = {"ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"},
+		                Days = {"lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"}]
+		        ],
+		        Names = Record.FieldOrDefault(NamesByCulture, Lang, null),
+		        // Day.Sunday is 0 ... Day.Saturday is 6: the position in this list is the Day value
+		        FirstDay = List.PositionOf({"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}, FirstDayName),
+		        Start = if WholeYears then #date(Date.Year(StartDate), 1, 1) else StartDate,
+		        End = if WholeYears then #date(Date.Year(EndDate), 12, 31) else EndDate,
+		        Days =
+		            if Names = null then
+		                error Error.Record("Expression.Error", "CSalcedoCalendar: Culture is en-US or es-ES", Lang)
+		            else if FirstDay < 0 then
+		                error Error.Record("Expression.Error", "CSalcedoCalendar: WeekStart is a day name in English, Monday to Sunday", FirstDayName)
+		            else if not List.Contains({1..12}, FiscalStart) then
+		                error Error.Record("Expression.Error", "CSalcedoCalendar: FiscalStartMonth is a month, 1 to 12", FiscalStart)
+		            else if EndDate < StartDate then
+		                error Error.Record("Expression.Error", "CSalcedoCalendar: EndDate is before StartDate; pass the first date, then the last", EndDate)
+		            else List.Dates(Start, Duration.Days(End - Start) + 1, #duration(1, 0, 0, 0)),
+		        Base = Table.FromColumns({Days}, type table [Date = date]),
+		        WithDateKey = Table.AddColumn(Base, "DateKey", each Date.Year([Date]) * 10000 + Date.Month([Date]) * 100 + Date.Day([Date]), Int64.Type),
+		        WithYear = Table.AddColumn(WithDateKey, "Year", each Date.Year([Date]), Int64.Type),
+		        WithQuarter = Table.AddColumn(WithYear, "Quarter", each Date.QuarterOfYear([Date]), Int64.Type),
+		        WithQuarterName = Table.AddColumn(WithQuarter, "QuarterName", each QLabel & Text.From([Quarter]), type text),
+		        WithYearQuarter = Table.AddColumn(WithQuarterName, "YearQuarter", each [Year] * 10 + [Quarter], Int64.Type),
+		        WithYearQuarterName = Table.AddColumn(WithYearQuarter, "YearQuarterName", each Text.From([Year]) & " " & [QuarterName], type text),
+		        WithMonth = Table.AddColumn(WithYearQuarterName, "Month", each Date.Month([Date]), Int64.Type),
+		        WithMonthName = Table.AddColumn(WithMonth, "MonthName", each Names[Months]{[Month] - 1}, type text),
+		        WithMonthStart = Table.AddColumn(WithMonthName, "MonthStart", each Date.StartOfMonth([Date]), type date),
+		        WithYearMonth = Table.AddColumn(WithMonthStart, "YearMonth", each [Year] * 100 + [Month], Int64.Type),
+		        WithYearMonthName = Table.AddColumn(WithYearMonth, "YearMonthName", each Names[MonthsShort]{[Month] - 1} & " " & Text.From([Year]), type text),
+		        // The week that holds 1 January is week 1 and a new week starts on WeekStart (not the ISO week)
+		        WithWeekNumber = Table.AddColumn(WithYearMonthName, "WeekNumber", each Date.WeekOfYear([Date], FirstDay), Int64.Type),
+		        WithDayOfWeek = Table.AddColumn(WithWeekNumber, "DayOfWeek", each Date.DayOfWeek([Date], FirstDay) + 1, Int64.Type),
+		        WithDayName = Table.AddColumn(WithDayOfWeek, "DayName", each Names[Days]{Date.DayOfWeek([Date], Day.Monday)}, type text),
+		        // Saturday and Sunday, whatever day the week starts on
+		        WithIsWeekend = Table.AddColumn(WithDayName, "IsWeekend", each Date.DayOfWeek([Date], Day.Monday) >= 5, type logical),
+		        // The fiscal year is named by the calendar year it ends in (July 2024 starts FY 2025)
+		        WithFiscalYear = Table.AddColumn(WithIsWeekend, "FiscalYear", each [Year] + (if FiscalStart > 1 and [Month] >= FiscalStart then 1 else 0), Int64.Type),
+		        WithFiscalQuarter = Table.AddColumn(WithFiscalYear, "FiscalQuarter", each Number.IntegerDivide(Number.Mod([Month] - FiscalStart + 12, 12), 3) + 1, Int64.Type),
+		        WithFiscalMonth = Table.AddColumn(WithFiscalQuarter, "FiscalMonth", each Number.Mod([Month] - FiscalStart + 12, 12) + 1, Int64.Type)
+		    in
+		        WithFiscalMonth,
+
+		    Documentation = [
+		        Documentation.Name = "CSalcedoCalendar",
+		        Documentation.Description = "A date table: one row per day between two dates, with year, quarter, month, week, day and fiscal columns.",
+		        Documentation.LongDescription =
+		            "<p>Builds a ready-to-use date table for Power BI: one row per day from <b>StartDate</b> to <b>EndDate</b>, " &
+		            "with no gaps. Load it as a table and mark it as the date table of your model.</p>" &
+		            "<p><b>Parameters</b></p><ul>" &
+		            "<li><b>StartDate</b> (date): the first date to cover.</li>" &
+		            "<li><b>EndDate</b> (date): the last date to cover. It cannot be before StartDate.</li>" &
+		            "<li><b>Culture</b> (text, optional, default ""en-US""): the language of the month and day names, ""en-US"" or ""es-ES"".</li>" &
+		            "<li><b>WeekStart</b> (text, optional, default ""Monday""): the first day of the week, in English: ""Monday"" to ""Sunday"". It sets WeekNumber and DayOfWeek.</li>" &
+		            "<li><b>QuarterLabel</b> (text, optional, default ""Q""): the letter before the quarter number, for example ""Q"" gives Q1 and ""T"" gives T1.</li>" &
+		            "<li><b>FiscalStartMonth</b> (number, optional, default 1): the month the fiscal year starts, 1 to 12. With 7 the fiscal year runs July to June and is named by the year it ends in.</li>" &
+		            "<li><b>FullYears</b> (true/false, optional, default true): true widens the range to whole years, 1 January to 31 December.</li></ul>" &
+		            "<p><b>Columns</b>: Date, DateKey (yyyymmdd), Year, Quarter, QuarterName, YearQuarter, YearQuarterName, Month, MonthName, " &
+		            "MonthStart, YearMonth, YearMonthName, WeekNumber, DayOfWeek (1 = WeekStart), DayName, IsWeekend, FiscalYear, FiscalQuarter, FiscalMonth.</p>" &
+		            "<p><b>Example</b>: <code>CSalcedoCalendar(#date(2023, 1, 1), #date(2024, 12, 31), ""es-ES"", ""Monday"", ""T"", 7)</code></p>" &
+		            "<p>Author: Cristóbal Salcedo · CSalcedoDataBI. License: MIT, free to use, copy and change; keep this note.</p>",
+		        Documentation.Author = "Cristóbal Salcedo · CSalcedoDataBI",
+		        Documentation.Version = "1.0.0",
+		        Documentation.Examples = {
+		            [
+		                Description = "Two full years with weeks from Sunday",
+		                Code = "CSalcedoCalendar(#date(2023, 1, 1), #date(2024, 12, 31), ""en-US"", ""Sunday"")",
+		                Result = "731 rows, 1 January 2023 to 31 December 2024"
+		            ],
+		            [
+		                Description = "Spanish names, quarters as T1..T4 and a fiscal year that starts in July",
+		                Code = "CSalcedoCalendar(#date(2024, 1, 1), #date(2024, 12, 31), ""es-ES"", ""Monday"", ""T"", 7)",
+		                Result = "366 rows; July 2024 is FiscalYear 2025, FiscalMonth 1"
+		            ]
+		        }
+		    ],
+
+		    ParameterTypes = type function (
+		        StartDate as (type date meta [Documentation.FieldCaption = "Start date", Documentation.FieldDescription = "The first date to cover", Documentation.SampleValues = {#date(2023, 1, 1)}]),
+		        EndDate as (type date meta [Documentation.FieldCaption = "End date", Documentation.FieldDescription = "The last date to cover", Documentation.SampleValues = {#date(2024, 12, 31)}]),
+		        optional Culture as (type nullable text meta [Documentation.FieldCaption = "Culture", Documentation.FieldDescription = "Language of the month and day names", Documentation.AllowedValues = {"en-US", "es-ES"}]),
+		        optional WeekStart as (type nullable text meta [Documentation.FieldCaption = "Week starts on", Documentation.FieldDescription = "First day of the week", Documentation.AllowedValues = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}]),
+		        optional QuarterLabel as (type nullable text meta [Documentation.FieldCaption = "Quarter label", Documentation.FieldDescription = "Letter before the quarter number", Documentation.SampleValues = {"Q"}]),
+		        optional FiscalStartMonth as (type nullable number meta [Documentation.FieldCaption = "Fiscal year starts in month", Documentation.FieldDescription = "1 to 12; 1 is the calendar year", Documentation.AllowedValues = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}]),
+		        optional FullYears as (type nullable logical meta [Documentation.FieldCaption = "Full years", Documentation.FieldDescription = "true widens the range to whole years", Documentation.AllowedValues = {true, false}])
+		    ) as table meta Documentation
+		in
+		    Value.ReplaceType(CSalcedoCalendar, ParameterTypes)
+	lineageTag: 8e3b6f14-2a9d-4c07-b5e2-6d1f0a7c3b58
+
+	annotation PBI_ResultType = Function
+
+	annotation CSalcedo_Source = etl-blueprints-for-agents v0.18.0, library/calendar/fnCalendar.pq (calendar spec 1.1.0)
+
