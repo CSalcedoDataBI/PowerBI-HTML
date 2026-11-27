@@ -1,5 +1,5 @@
 param([string]$Name,[string]$Measure,[string]$Title,[string]$Slug,[string]$Page,[string]$Intro,[string]$Needs)
-$g='D:\MIS-REPO\PowerBI-HTML'; $d="$g\$Name"
+$g=Split-Path $PSScriptRoot -Parent; $d="$g\$Name"
 node -e "const s=require('sharp');(async()=>{const r=process.argv[1];const b=await s(r+'/preview.png').flatten({background:'#fff'}).trim({background:'#fff',threshold:8}).toBuffer();await s(b).resize(1520,820,{fit:'contain',background:'#fff'}).extend({top:40,bottom:40,left:40,right:40,background:'#fff'}).png().toFile(r+'/card.png')})()" $d
 $t=Get-Content "$d\pbip\$Name.SemanticModel\definition\tables\Metric.tmdl" -Raw; $a=$t.IndexOf("measure '$Measure'"); $b=$t.IndexOf("lineageTag:",$a)
 $meas=($t.Substring($a,$b-$a).TrimEnd() -replace "(?m)^\t\t\t",'' -replace '^measure ','')
