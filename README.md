@@ -13,7 +13,7 @@ Galería con vista previa: <https://csalcedodatabi.com/recursos/galeria-html/>
 ```
 Nombre_Del_Visual/
 ├── README.md              qué responde, qué campos necesita, cómo conectarlo a tus datos
-├── pbip/ContosoRetail.*   el informe + su modelo Contoso, en texto; abre y pinta sin refrescar
+├── pbip/Contoso-Retail.*  el informe sobre el maestro Contoso-Retail (2023–2024), en texto
 ├── <visual>.dax           la medida HTML suelta, para copiar
 └── Nombre_Del_Visual.zip  todo lo anterior
 ```
@@ -21,7 +21,7 @@ Nombre_Del_Visual/
 ## Cómo se usa
 
 1. Descarga el `.zip` de la carpeta y descomprímelo.
-2. Abre `pbip/ContosoRetail.pbip` en Power BI Desktop (activa la vista previa de PBIP si te lo pide).
+2. Abre `pbip/Contoso-Retail.pbip` en Power BI Desktop y pulsa **Actualizar** la primera vez (lee los datos de SampleDataSets).
 3. El visual está en su página; el README de la carpeta dice qué medida copiar y qué campos cambiar.
 
 ## Visuales
