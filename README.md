@@ -32,6 +32,7 @@ Haz clic en una imagen para abrir su carpeta: README, medida DAX y PBIP.
 
 <table>
 <tr><td align="center" width="50%"><a href="Embudo_Clientes/"><img src="Embudo_Clientes/card.png" width="100%" alt="Embudo de clientes"></a><br><b><a href="Embudo_Clientes/">Embudo de clientes</a></b></td><td align="center" width="50%"><a href="Calendario_Ventas/"><img src="Calendario_Ventas/card.png" width="100%" alt="Calendario de ventas"></a><br><b><a href="Calendario_Ventas/">Calendario de ventas</a></b></td></tr>
+<tr><td align="center" width="50%"><a href="Podio_Marcas/"><img src="Podio_Marcas/card.png" width="100%" alt="Podio de marcas"></a><br><b><a href="Podio_Marcas/">Podio de marcas</a></b></td><td width="50%"></td></tr>
 </table>
 
 ## Licencia

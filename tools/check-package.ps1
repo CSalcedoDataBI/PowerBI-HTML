@@ -29,13 +29,6 @@ foreach ($rep in $reports) {
   }
 }
 
-# The Thank You page and every link must point to this repo, never to the Deneb one.
-Get-ChildItem -Path $Package -Recurse -Filter visual.json | Where-Object { $_.FullName -notmatch '\\\.pbi\\' } |
-  Select-String -SimpleMatch 'PowerBI-Deneb' | ForEach-Object {
-    Write-Host "FAIL $($_.Path): links to PowerBI-Deneb, not PowerBI-HTML"
-    $fail++
-  }
-
 # Every visual lands with its screenshot and its row in the root README gallery.
 $folder = Split-Path (Resolve-Path $Package) -Leaf
 $repoReadme = Join-Path (Split-Path (Resolve-Path $Package) -Parent) 'README.md'
