@@ -7,7 +7,7 @@ cuenta en una frase.
 
 Ficha y vista previa: <https://csalcedodatabi.com/recursos/galeria-html/embudo-clientes>
 
-![Embudo de clientes](embudo-clientes.png)
+![Embudo de clientes](preview.png)
 
 ---
 

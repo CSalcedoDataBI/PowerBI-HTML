@@ -26,7 +26,11 @@ Nombre_Del_Visual/
 
 ## Visuales
 
-Todavía ninguno: cada visual se publica aquí solo después de revisarlo.
+Haz clic en una imagen para abrir su carpeta: README, medida DAX y PBIP.
+
+| | |
+|:---:|:---:|
+| [![Embudo de clientes](Embudo_Clientes/preview.png)](Embudo_Clientes/)<br>**[Embudo de clientes](Embudo_Clientes/)**<br>¿Dónde se pierden los clientes? | |
 
 ## Licencia
 

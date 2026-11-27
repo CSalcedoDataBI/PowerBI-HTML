@@ -36,5 +36,17 @@ Get-ChildItem -Path $Package -Recurse -Filter visual.json | Where-Object { $_.Fu
     $fail++
   }
 
+# Every visual lands with its screenshot and its row in the root README gallery.
+$folder = Split-Path (Resolve-Path $Package) -Leaf
+$repoReadme = Join-Path (Split-Path (Resolve-Path $Package) -Parent) 'README.md'
+if (-not (Test-Path (Join-Path $Package 'preview.png'))) {
+  Write-Host "FAIL $folder`: no preview.png (crop of the visual, captured clean in Desktop)"
+  $fail++
+}
+if ((Test-Path $repoReadme) -and -not (Select-String -Path $repoReadme -SimpleMatch "($folder/preview.png)" -Quiet)) {
+  Write-Host "FAIL $folder`: no row in the README gallery (image $folder/preview.png linking to $folder/)"
+  $fail++
+}
+
 if ($fail) { exit 1 }
 Write-Host "OK: every custom visual is registered"
