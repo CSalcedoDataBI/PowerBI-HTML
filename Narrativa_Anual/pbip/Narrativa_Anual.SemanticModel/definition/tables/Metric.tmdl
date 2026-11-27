@@ -1,0 +1,238 @@
+/// Measures container: a one-row Power Query table that holds all reusable measures, grouped in display folders. Contains no business data.
+table Metric
+	lineageTag: f1000000-0000-0000-0000-000000000001
+
+	/// Value of the goods sold after discounts, quantity times net price, in the transaction currency.
+	measure 'Total Sales' = SUMX(FactSales, FactSales[Quantity] * FactSales[NetPrice])
+		formatString: \$#,0
+		displayFolder: 01 Sales & Revenue
+		lineageTag: b1000000-0000-0000-0000-000000000001
+
+	/// Units sold, the sum of the quantity of every order line.
+	measure 'Total Quantity' = SUM(FactSales[Quantity])
+		formatString: #,0
+		displayFolder: 01 Sales & Revenue
+		lineageTag: b1000000-0000-0000-0000-000000000002
+
+	/// Number of distinct orders (order numbers), not order lines.
+	measure Orders = DISTINCTCOUNT(FactSales[OrderKey])
+		formatString: #,0
+		displayFolder: 01 Sales & Revenue
+		lineageTag: b1000000-0000-0000-0000-000000000003
+
+	/// Net sales divided by orders, what one order is worth on average.
+	measure 'Average Order Value' = DIVIDE([Total Sales], [Orders])
+		formatString: \$#,0.00
+		displayFolder: 04 Pricing & Basket
+		lineageTag: b1000000-0000-0000-0000-000000000004
+
+	/// What the goods sold cost, quantity times unit cost.
+	measure 'Total Cost' = SUMX(FactSales, FactSales[Quantity] * FactSales[UnitCost])
+		formatString: \$#,0
+		displayFolder: 02 Profitability
+		lineageTag: b1000000-0000-0000-0000-000000000005
+
+	/// Net sales minus the cost of goods sold, as an amount.
+	measure 'Gross Margin' = [Total Sales] - [Total Cost]
+		formatString: \$#,0
+		displayFolder: 02 Profitability
+		lineageTag: b1000000-0000-0000-0000-000000000006
+
+	/// Share of net sales left after the cost of goods sold.
+	measure 'Margin %' = DIVIDE([Gross Margin], [Total Sales])
+		formatString: 0.0%
+		displayFolder: 02 Profitability
+		lineageTag: b1000000-0000-0000-0000-000000000007
+
+	/// Number of distinct customers who bought in the period.
+	measure 'Distinct Customers' = DISTINCTCOUNT(FactSales[CustomerKey])
+		formatString: #,0
+		displayFolder: 03 Customers
+		lineageTag: b1000000-0000-0000-0000-000000000008
+
+	/// Net sales divided by the customers who bought.
+	measure 'Sales per Customer' = DIVIDE([Total Sales], [Distinct Customers])
+		formatString: \$#,0
+		displayFolder: 03 Customers
+		lineageTag: b1000000-0000-0000-0000-000000000009
+
+	/// Net sales divided by units sold, the price actually paid per unit.
+	measure 'Average Selling Price' = DIVIDE([Total Sales], [Total Quantity])
+		formatString: \$#,0.00
+		displayFolder: 04 Pricing & Basket
+		lineageTag: b1000000-0000-0000-0000-00000000000a
+
+	/// Units sold divided by orders, the size of an average basket.
+	measure 'Units per Order' = DIVIDE([Total Quantity], [Orders])
+		formatString: #,0.0
+		displayFolder: 04 Pricing & Basket
+		lineageTag: b1000000-0000-0000-0000-00000000000b
+
+	/// Net sales in the filter as a share of net sales of all rows; the mix of a category, store or customer.
+	measure '% of Total Sales' = DIVIDE([Total Sales], CALCULATE([Total Sales], REMOVEFILTERS()))
+		formatString: 0.0%
+		displayFolder: 01 Sales & Revenue
+		lineageTag: b1000000-0000-0000-0000-00000000000c
+
+	/// Net sales from the start of the year to the last date in the filter.
+	measure 'Sales YTD' = TOTALYTD([Total Sales], DimDate[Date])
+		formatString: \$#,0
+		displayFolder: 01 Sales & Revenue\Time intelligence\Total Sales
+		lineageTag: b1000000-0000-0000-0000-00000000000d
+
+	/// Net sales for the same period one year earlier; the base of year-over-year growth.
+	measure 'Sales PY' = CALCULATE([Total Sales], SAMEPERIODLASTYEAR(DimDate[Date]))
+		formatString: \$#,0
+		displayFolder: 01 Sales & Revenue\Time intelligence\Total Sales
+		lineageTag: b1000000-0000-0000-0000-00000000000e
+
+	/// Net sales against the same period one year earlier, as a relative change.
+	measure 'Sales YoY %' = DIVIDE([Total Sales] - [Sales PY], [Sales PY])
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 01 Sales & Revenue\Time intelligence\Total Sales
+		lineageTag: b1000000-0000-0000-0000-00000000000f
+
+	/// Net sales converted to US dollars with the exchange rate of each order line; the only sales total that adds across countries. Higher is better.
+	measure 'Net Sales USD' = SUM ( FactSales[Net Amount USD] )
+		formatString: \$#,0
+		displayFolder: 01 Sales & Revenue
+		lineageTag: 58d4adc5-3700-4aab-b390-2874fe8b3942
+
+	/// Net sales counted on the delivery date instead of the order date, for logistics and revenue recognised on delivery.
+	measure 'Net Sales by Delivery Date' = CALCULATE ( [Total Sales], USERELATIONSHIP ( FactSales[DeliveryDate], DimDate[Date] ) )
+		formatString: \$#,0
+		displayFolder: 06 Delivery
+		lineageTag: 7cecf0e5-048f-416e-81a6-20ca089cf2bc
+
+	/// Average days from order to delivery over the delivered order lines. Lower is better.
+	measure 'Average Delivery Days' = AVERAGE ( FactSales[Delivery Days] )
+		formatString: #,0.0
+		displayFolder: 06 Delivery
+		lineageTag: 7d087ba6-27d9-4352-aa4e-176c4a6c2c82
+
+	/// Orders with at least one line delivered after the delivery window. Lower is better.
+	measure 'Late Orders' = CALCULATE ( DISTINCTCOUNT ( FactSales[OrderKey] ), FactSales[Late Delivery] = "Yes" )
+		formatString: #,0
+		displayFolder: 06 Delivery
+		lineageTag: c975f5c5-0866-4d35-8f2b-6664cac57c5b
+
+	/// Share of orders delivered late. Lower is better. Ratio: never sum it.
+	measure 'Late Order %' = DIVIDE ( [Late Orders], [Orders] )
+		formatString: 0.0%
+		displayFolder: 06 Delivery
+		lineageTag: 1d6e7cef-aff2-46e9-8a16-558954c859fa
+
+	/// Change in net sales of comparable stores against the same period one year earlier. Higher is better. Ratio: never sum it.
+	measure 'Same-Store Sales Growth' = VAR cur = CALCULATE ( [Total Sales], DimStore[Comparable Store] = "Yes" ) VAR py = CALCULATE ( [Total Sales], DimStore[Comparable Store] = "Yes", SAMEPERIODLASTYEAR ( DimDate[Date] ) ) RETURN DIVIDE ( cur - py, py )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 05 Time Intelligence
+		lineageTag: 7615a1cd-e62d-4aa8-acbd-ce21f128023e
+
+	/// Share of net sales spent on the cost of the goods; the complement of margin %. Lower is better. Ratio of Total Cost to Total Sales: never sum it, recompute it in each filter.
+	measure 'Cost %' = DIVIDE ( [Total Cost], [Total Sales] )
+		formatString: 0.0%
+		displayFolder: 02 Profitability
+		lineageTag: 9e6459bf-c90a-4a90-813c-268941f6a66b
+
+	/// Gross margin earned on each unit sold. Higher is better. Ratio of Gross Margin to Total Quantity: never sum it, recompute it in each filter.
+	measure 'Margin per Unit' = DIVIDE ( [Gross Margin], [Total Quantity] )
+		formatString: \$#,0.00
+		displayFolder: 02 Profitability
+		lineageTag: bb5a6201-8879-4164-a416-8e95bec724ce
+
+	/// Average cost of one unit sold. Ratio of Total Cost to Total Quantity: never sum it, recompute it in each filter.
+	measure 'Cost per Unit' = DIVIDE ( [Total Cost], [Total Quantity] )
+		formatString: \$#,0.00
+		displayFolder: 02 Profitability
+		lineageTag: 3b098227-96b2-46b6-9bb1-db4b0d91ad40
+
+	/// Value of the goods sold at list price, before discounts, quantity times unit price. Higher is better.
+	measure 'Gross Sales' = SUMX ( FactSales, FactSales[Quantity] * FactSales[UnitPrice] )
+		formatString: \$#,0
+		displayFolder: 04 Pricing & Basket
+		lineageTag: ec071407-7e23-44b7-92a6-a3b7634a8ffe
+
+	/// Value given away below list price, gross sales minus net sales. Lower is better.
+	measure 'Discount Amount' = [Gross Sales] - [Total Sales]
+		formatString: \$#,0
+		displayFolder: 04 Pricing & Basket
+		lineageTag: a1f5553e-9df0-463a-856f-2f0e764f4868
+
+	/// Share of gross sales given away as discount. Lower is better. Ratio of Discount Amount to Gross Sales: never sum it, recompute it in each filter.
+	measure 'Discount %' = DIVIDE ( [Discount Amount], [Gross Sales] )
+		formatString: 0.0%
+		displayFolder: 04 Pricing & Basket
+		lineageTag: 99dcdb37-ca36-49be-9c43-1b8de613beee
+
+	/// Average net amount of one order line (not of one order; for orders read average order value). Higher is better. Does not add up: recompute it in each filter, never sum it.
+	measure 'Average Sales' = AVERAGEX ( FactSales, FactSales[Quantity] * FactSales[NetPrice] )
+		formatString: \$#,0.00
+		displayFolder: 04 Pricing & Basket
+		lineageTag: 53ad0520-bac1-4ca0-90e8-dabdfdf23a6f
+
+	/// Average cost of one order line. Does not add up: recompute it in each filter, never sum it.
+	measure 'Average Cost' = AVERAGEX ( FactSales, FactSales[Quantity] * FactSales[UnitCost] )
+		formatString: \$#,0.00
+		displayFolder: 04 Pricing & Basket
+		lineageTag: 0187c0b8-4456-4706-97ae-fe87f2551ec3
+
+	/// Average units on one order line. Does not add up: recompute it in each filter, never sum it.
+	measure 'Average Quantity' = AVERAGE ( FactSales[Quantity] )
+		formatString: #,0.00
+		displayFolder: 04 Pricing & Basket
+		lineageTag: 55b856cd-97e0-435f-b8d5-1003782b3a91
+
+	/// Number of order lines (rows of the sales fact). The denominator of the three line averages, and so the weight a visual uses to aggregate them over months.
+	measure 'Order Lines' = COUNTROWS ( FactSales )
+		formatString: #,0
+		displayFolder: 04 Pricing & Basket
+		lineageTag: 7a58a97e-7fc7-43f1-88d0-4b3097e25eef
+
+	/// The year in three sentences written from the model: total and change, the leading brand and its share, the category that grew most and the one that fell most, and the margin. By CSalcedoDataBI.
+	measure 'HTML Insight Narrative' =
+			VAR _year = SELECTEDVALUE ( 'DimDate'[Year] )
+			VAR _cy = [Total Sales]
+			VAR _py = [Sales PY]
+			VAR _chg = DIVIDE ( _cy - _py, _py )
+			VAR _brands = FILTER ( ADDCOLUMNS ( VALUES ( 'DimProduct'[Brand] ), "@v", [Total Sales] ), [@v] > 0 )
+			VAR _topB = TOPN ( 1, _brands, [@v], DESC )
+			VAR _topName = MAXX ( _topB, 'DimProduct'[Brand] & "" )
+			VAR _topV = MAXX ( _topB, [@v] )
+			VAR _cats = FILTER ( ADDCOLUMNS ( VALUES ( 'DimProduct'[CategoryName] ), "@g", DIVIDE ( [Total Sales] - [Sales PY], [Sales PY] ) ), NOT ISBLANK ( [@g] ) )
+			VAR _best = TOPN ( 1, _cats, [@g], DESC )
+			VAR _worst = TOPN ( 1, _cats, [@g], ASC )
+			VAR _bestName = MAXX ( _best, 'DimProduct'[CategoryName] & "" )
+			VAR _bestG = MAXX ( _best, [@g] )
+			VAR _worstName = MAXX ( _worst, 'DimProduct'[CategoryName] & "" )
+			VAR _worstG = MAXX ( _worst, [@g] )
+			VAR _mPct = [Margin %]
+			VAR _esc = SUBSTITUTE ( SUBSTITUTE ( _topName, "&", "&amp;" ), "<", "&lt;" )
+			RETURN
+			    "<style>.hs-story p{border-left:3px solid transparent;padding-left:6px;transition:border-color .15s}.hs-story p:hover{border-left-color:#3FB8A6}</style><div class='hs-story' style=""font-family:'Segoe UI',sans-serif;color:#334155;width:100%;height:100%;padding:8px 14px;box-sizing:border-box""> "
+			        & "<div class='subtitle' style=""font-size:12px;font-weight:600;color:#3FB8A6;letter-spacing:1px"">THE YEAR IN THREE SENTENCES" & IF ( ISBLANK ( _year ), "", " · " & _year ) & "</div> "
+			        & "<div class='title' style=""font-size:30px;font-weight:700;color:#1F3A5F;margin:10px 0 18px 0;line-height:1.15"">Sales " & IF ( _chg >= 0, "grew", "fell" ) & " " & FORMAT ( ABS ( _chg ), "0.0%", "en-US" ) & " to " & FORMAT ( _cy / 1000000, "$#,0.0", "en-US" ) & "M</div> "
+			        & "<div class='insight' style=""font-size:17px;line-height:1.55""> "
+			        & "<p style=""margin:0 0 12px 0"" title='" & _esc & " · share of the total " & FORMAT ( DIVIDE ( _topV, _cy ), "0.0%", "en-US" ) & " · rank 1 of " & COUNTROWS ( _brands ) & " brands" & "'><b style=""color:#1F3A5F"">" & _esc & "</b> led the brands with " & FORMAT ( _topV / 1000000, "$#,0.0", "en-US" ) & "M, " & FORMAT ( DIVIDE ( _topV, _cy ), "0%", "en-US" ) & " of the total.</p> "
+			        & "<p style=""margin:0 0 12px 0"" title='Best: " & _bestName & " " & FORMAT ( _bestG, "+0.0%;-0.0%", "en-US" ) & " · worst: " & _worstName & " " & FORMAT ( _worstG, "+0.0%;-0.0%", "en-US" ) & " · gap between them " & FORMAT ( _bestG - _worstG, "0.0", "en-US" ) & " pp'><b style=""color:#1E7A45"">" & SUBSTITUTE ( _bestName, "&", "&amp;" ) & "</b> grew the most (" & FORMAT ( _bestG, "+0.0%;-0.0%", "en-US" ) & "), while <b style=""color:#B42318"">" & SUBSTITUTE ( _worstName, "&", "&amp;" ) & "</b> " & IF ( _worstG < 0, "fell the most", "grew the least" ) & " (" & FORMAT ( _worstG, "+0.0%;-0.0%", "en-US" ) & ").</p> "
+			        & "<p style=""margin:0"">The margin was <b style=""color:#1F3A5F"">" & FORMAT ( _mPct, "0.0%", "en-US" ) & "</b> of sales, against " & FORMAT ( _py / 1000000, "$#,0.0", "en-US" ) & "M of sales the year before.</p> "
+			        & "</div> "
+			        & "<div style=""font-size:11px;color:#94A3B8;margin-top:18px"">Written from the model on each refresh: the sentences change with the Year slicer.</div> "
+			        & "</div>"
+		lineageTag: 5e1c0a00-0000-4000-8000-000000000018
+
+	column Placeholder
+		dataType: string
+		isHidden
+		lineageTag: f1000000-0000-0000-0000-0000000000c1
+		summarizeBy: none
+		sourceColumn: Placeholder
+
+	partition Metric = m
+		mode: import
+		source =
+				let
+				    // Home of the measures: one empty row, no data (was a DAX calculated table).
+				    Result = #table(type table [Placeholder = text], {{""}})
+				in
+				    Result
+

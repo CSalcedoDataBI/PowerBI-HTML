@@ -1,0 +1,31 @@
+-- The HTML: put this measure in an HTML Content visual. Uses [Total Sales], [Sales PY] and DimProduct columns of Contoso-Retail.
+'HTML Insight Narrative' =
+VAR _year = SELECTEDVALUE ( 'DimDate'[Year] )
+VAR _cy = [Total Sales]
+VAR _py = [Sales PY]
+VAR _chg = DIVIDE ( _cy - _py, _py )
+VAR _brands = FILTER ( ADDCOLUMNS ( VALUES ( 'DimProduct'[Brand] ), "@v", [Total Sales] ), [@v] > 0 )
+VAR _topB = TOPN ( 1, _brands, [@v], DESC )
+VAR _topName = MAXX ( _topB, 'DimProduct'[Brand] & "" )
+VAR _topV = MAXX ( _topB, [@v] )
+VAR _cats = FILTER ( ADDCOLUMNS ( VALUES ( 'DimProduct'[CategoryName] ), "@g", DIVIDE ( [Total Sales] - [Sales PY], [Sales PY] ) ), NOT ISBLANK ( [@g] ) )
+VAR _best = TOPN ( 1, _cats, [@g], DESC )
+VAR _worst = TOPN ( 1, _cats, [@g], ASC )
+VAR _bestName = MAXX ( _best, 'DimProduct'[CategoryName] & "" )
+VAR _bestG = MAXX ( _best, [@g] )
+VAR _worstName = MAXX ( _worst, 'DimProduct'[CategoryName] & "" )
+VAR _worstG = MAXX ( _worst, [@g] )
+VAR _mPct = [Margin %]
+VAR _esc = SUBSTITUTE ( SUBSTITUTE ( _topName, "&", "&amp;" ), "<", "&lt;" )
+RETURN
+    "<style>.hs-story p{border-left:3px solid transparent;padding-left:6px;transition:border-color .15s}.hs-story p:hover{border-left-color:#3FB8A6}</style><div class='hs-story' style=""font-family:'Segoe UI',sans-serif;color:#334155;width:100%;height:100%;padding:8px 14px;box-sizing:border-box""> "
+        & "<div class='subtitle' style=""font-size:12px;font-weight:600;color:#3FB8A6;letter-spacing:1px"">THE YEAR IN THREE SENTENCES" & IF ( ISBLANK ( _year ), "", " · " & _year ) & "</div> "
+        & "<div class='title' style=""font-size:30px;font-weight:700;color:#1F3A5F;margin:10px 0 18px 0;line-height:1.15"">Sales " & IF ( _chg >= 0, "grew", "fell" ) & " " & FORMAT ( ABS ( _chg ), "0.0%", "en-US" ) & " to " & FORMAT ( _cy / 1000000, "$#,0.0", "en-US" ) & "M</div> "
+        & "<div class='insight' style=""font-size:17px;line-height:1.55""> "
+        & "<p style=""margin:0 0 12px 0"" title='" & _esc & " · share of the total " & FORMAT ( DIVIDE ( _topV, _cy ), "0.0%", "en-US" ) & " · rank 1 of " & COUNTROWS ( _brands ) & " brands" & "'><b style=""color:#1F3A5F"">" & _esc & "</b> led the brands with " & FORMAT ( _topV / 1000000, "$#,0.0", "en-US" ) & "M, " & FORMAT ( DIVIDE ( _topV, _cy ), "0%", "en-US" ) & " of the total.</p> "
+        & "<p style=""margin:0 0 12px 0"" title='Best: " & _bestName & " " & FORMAT ( _bestG, "+0.0%;-0.0%", "en-US" ) & " · worst: " & _worstName & " " & FORMAT ( _worstG, "+0.0%;-0.0%", "en-US" ) & " · gap between them " & FORMAT ( _bestG - _worstG, "0.0", "en-US" ) & " pp'><b style=""color:#1E7A45"">" & SUBSTITUTE ( _bestName, "&", "&amp;" ) & "</b> grew the most (" & FORMAT ( _bestG, "+0.0%;-0.0%", "en-US" ) & "), while <b style=""color:#B42318"">" & SUBSTITUTE ( _worstName, "&", "&amp;" ) & "</b> " & IF ( _worstG < 0, "fell the most", "grew the least" ) & " (" & FORMAT ( _worstG, "+0.0%;-0.0%", "en-US" ) & ").</p> "
+        & "<p style=""margin:0"">The margin was <b style=""color:#1F3A5F"">" & FORMAT ( _mPct, "0.0%", "en-US" ) & "</b> of sales, against " & FORMAT ( _py / 1000000, "$#,0.0", "en-US" ) & "M of sales the year before.</p> "
+        & "</div> "
+        & "<div style=""font-size:11px;color:#94A3B8;margin-top:18px"">Written from the model on each refresh: the sentences change with the Year slicer.</div> "
+        & "</div>"
+
