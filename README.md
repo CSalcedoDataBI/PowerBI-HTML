@@ -35,3 +35,18 @@ Haz clic en una imagen para abrir su carpeta: README, medida DAX y PBIP.
 ## Licencia
 
 MIT. Úsalo, cámbialo y compártelo; se agradece la mención.
+
+---
+
+<div align="center">
+
+[![Sitio](https://img.shields.io/badge/Sitio-csalcedodatabi.com-1F3A5F?style=for-the-badge&logo=googlechrome&logoColor=white)](https://csalcedodatabi.com)
+[![Blog](https://img.shields.io/badge/Blog-art%C3%ADculos-1F3A5F?style=for-the-badge&logo=rss&logoColor=white)](https://csalcedodatabi.com/blog/)
+[![Galería HTML](https://img.shields.io/badge/Galer%C3%ADa-HTML-1F3A5F?style=for-the-badge&logo=html5&logoColor=white)](https://csalcedodatabi.com/recursos/galeria-html/)
+[![Galería Deneb](https://img.shields.io/badge/Galer%C3%ADa-Deneb-1F3A5F?style=for-the-badge&logo=powerbi&logoColor=white)](https://csalcedodatabi.com/deneb/)
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-cristobal--salcedo-1F3A5F?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/cristobal-salcedo)
+[![YouTube](https://img.shields.io/badge/YouTube-@CSalcedoDataBI-1F3A5F?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@CSalcedoDataBI)
+[![Contacto](https://img.shields.io/badge/Contacto-escr%C3%ADbeme-1F3A5F?style=for-the-badge&logo=maildotru&logoColor=white)](https://csalcedodatabi.com/contacto/)
+
+</div>
