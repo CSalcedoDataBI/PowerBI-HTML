@@ -1,0 +1,48 @@
+-- Disconnected table: one row per funnel stage
+'Funnel Stage' = DATATABLE("Stage", STRING, "StageOrder", INTEGER, "MinOrders", INTEGER, {{"All customers", 1, -1}, {"Bought", 2, 1}, {"4+ orders", 3, 4}, {"6+ orders", 4, 6}, {"8+ orders", 5, 8}})
+
+-- Customers at each stage
+'Funnel Customers' =
+VAR k = SELECTEDVALUE ( 'Funnel Stage'[MinOrders] )
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( k ), BLANK (),
+        k < 0, COUNTROWS ( DimCustomer ),
+        k <= 1, [Distinct Customers],
+        COUNTROWS ( FILTER ( VALUES ( FactSales[CustomerKey] ), CALCULATE ( DISTINCTCOUNT ( FactSales[OrderKey] ) ) >= k ) )
+    )
+
+-- The HTML: put this measure in the HTML Content visual
+'HTML Funnel Customers' =
+VAR _st = ADDCOLUMNS ( ALL ( 'Funnel Stage' ), "@v", [Funnel Customers] + 0 )
+VAR _first = MAXX ( FILTER ( _st, 'Funnel Stage'[StageOrder] = 1 ), [@v] )
+VAR _steps =
+    ADDCOLUMNS (
+        _st,
+        "@prev", VAR o = 'Funnel Stage'[StageOrder] RETURN MAXX ( FILTER ( _st, 'Funnel Stage'[StageOrder] = o - 1 ), [@v] ),
+        "@name", 'Funnel Stage'[Stage] & ""
+    )
+VAR _conv = ADDCOLUMNS ( _steps, "@step", DIVIDE ( [@v], [@prev] ) )
+VAR _worst = MINX ( FILTER ( _conv, NOT ISBLANK ( [@step] ) ), [@step] )
+RETURN
+    "<div style=""font-family:'Segoe UI',sans-serif;color:#334155;width:100%;height:100%;display:flex;flex-direction:column""> "
+        & "<div style=""font-size:15px;font-weight:600;color:#1F3A5F;margin:2px 0 2px 4px"">Customers by funnel stage</div> "
+        & "<div style=""font-size:11px;color:#64748B;margin:0 0 6px 4px"">The last stage keeps " & FORMAT ( DIVIDE ( MINX ( _st, [@v] ), _first ), "0.0%", "en-US" ) & " of the first · biggest drop in red (" & FORMAT ( 1 - _worst, "0%", "en-US" ) & " lost in one step)</div> "
+        & "<svg viewBox=""0 0 1000 560"" preserveAspectRatio=""xMidYMid meet"" style=""flex:1;width:100%""> "
+        & "<text x=""20"" y=""22"" font-size=""11"" font-weight=""600"" fill=""#64748B"">STAGE</text> "
+        & "<text x=""830"" y=""22"" text-anchor=""end"" font-size=""11"" font-weight=""600"" fill=""#64748B"">OF FIRST</text> "
+        & "<text x=""980"" y=""22"" text-anchor=""end"" font-size=""11"" font-weight=""600"" fill=""#64748B"">STEP</text> "
+        & CONCATENATEX (
+            _conv,
+            "<rect x=""" & ROUND ( 480 - DIVIDE ( [@v], _first ) * 260, 0 ) & """ y=""" & ROUND ( 40 + ( 'Funnel Stage'[StageOrder] - 1 ) * 102, 0 ) & """ width=""" & ROUND ( MAX ( 4, DIVIDE ( [@v], _first ) * 520 ), 0 ) & """ height=""74"" rx=""6"" fill=""" & IF ( NOT ISBLANK ( [@step] ) && [@step] = _worst, "#D64545", "#1F3A5F" ) & """ fill-opacity=""" & FORMAT ( 1 - ( 'Funnel Stage'[StageOrder] - 1 ) * 0.12, "0.00", "en-US" ) & """><title>" & [@name] & ": " & FORMAT ( [@v], "#,0", "en-US" ) & " customers</title></rect> "
+                & "<text x=""" & 480 & """ y=""" & ROUND ( 84 + ( 'Funnel Stage'[StageOrder] - 1 ) * 102, 0 ) & """ text-anchor=""middle"" font-size=""16"" font-weight=""700"" fill=""#FFFFFF"">" & FORMAT ( [@v], "#,0", "en-US" ) & "</text> "
+                & "<text x=""20"" y=""" & ROUND ( 82 + ( 'Funnel Stage'[StageOrder] - 1 ) * 102, 0 ) & """ font-size=""14"" font-weight=""600"" fill=""#334155"">" & [@name] & "</text> "
+                & "<text x=""830"" y=""" & ROUND ( 82 + ( 'Funnel Stage'[StageOrder] - 1 ) * 102, 0 ) & """ text-anchor=""end"" font-size=""14"" fill=""#334155"">" & FORMAT ( DIVIDE ( [@v], _first ), "0.0%", "en-US" ) & "</text> "
+                & "<text x=""980"" y=""" & ROUND ( 82 + ( 'Funnel Stage'[StageOrder] - 1 ) * 102, 0 ) & """ text-anchor=""end"" font-size=""14"" font-weight=""600"" fill=""" & IF ( NOT ISBLANK ( [@step] ) && [@step] = _worst, "#B42318", "#64748B" ) & """>" & IF ( ISBLANK ( [@step] ), "–", FORMAT ( [@step], "0.0%", "en-US" ) ) & "</text>",
+            "",
+            'Funnel Stage'[StageOrder], ASC
+        ) & " "
+        & "</svg> "
+        & "</div>"
+
