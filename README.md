@@ -8,6 +8,8 @@ lista para copiar en tu modelo. Hermano de [PowerBI-Deneb](https://github.com/CS
 
 Galería con vista previa: <https://csalcedodatabi.com/recursos/galeria-html/>
 
+<p align="center"><a href="Embudo_Clientes/"><img src="Embudo_Clientes/preview.png" width="100%" alt="Embudo de clientes"></a></p>
+
 ## Qué trae cada carpeta
 
 ```
@@ -28,9 +30,9 @@ Nombre_Del_Visual/
 
 Haz clic en una imagen para abrir su carpeta: README, medida DAX y PBIP.
 
-| | |
-|:---:|:---:|
-| [![Embudo de clientes](Embudo_Clientes/preview.png)](Embudo_Clientes/)<br>**[Embudo de clientes](Embudo_Clientes/)**<br>¿Dónde se pierden los clientes? | |
+<table>
+<tr><td align="center" width="50%"><a href="Embudo_Clientes/"><img src="Embudo_Clientes/card.png" width="100%" alt="Embudo de clientes"></a><br><b><a href="Embudo_Clientes/">Embudo de clientes</a></b></td><td width="50%"></td></tr>
+</table>
 
 ## Licencia
 
