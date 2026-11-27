@@ -43,8 +43,10 @@ if (-not (Test-Path (Join-Path $Package 'preview.png'))) {
   Write-Host "FAIL $folder`: no preview.png (crop of the visual, captured clean in Desktop)"
   $fail++
 }
-if ((Test-Path $repoReadme) -and -not (Select-String -Path $repoReadme -SimpleMatch "($folder/preview.png)" -Quiet)) {
-  Write-Host "FAIL $folder`: no row in the README gallery (image $folder/preview.png linking to $folder/)"
+$pv = Join-Path $Package 'preview.png'
+if (Test-Path $pv) { Add-Type -AssemblyName System.Drawing; $bm = [System.Drawing.Image]::FromFile((Resolve-Path $pv)); if ($bm.Width -lt 1200) { Write-Host "FAIL $folder`: preview.png is $($bm.Width) px wide, needs 1200+ (2x)"; $fail++ }; $bm.Dispose() }
+if ((Test-Path $repoReadme) -and -not (Select-String -Path $repoReadme -SimpleMatch "$folder/card.png" -Quiet)) {
+  Write-Host "FAIL $folder`: no cell in the README grid (image $folder/card.png linking to $folder/)"
   $fail++
 }
 
