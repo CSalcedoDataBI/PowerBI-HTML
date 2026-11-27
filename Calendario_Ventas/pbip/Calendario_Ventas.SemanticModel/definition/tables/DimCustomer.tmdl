@@ -1,0 +1,178 @@
+/// Customer dimension — one row per customer (~12,000). Demographics + geography (Country, State, City). 100% synthetic (Faker) — no real people.
+table DimCustomer
+	lineageTag: 6a360cc3-1bd4-5d4a-9699-d8fed6ee3309
+
+	/// Surrogate customer key. Joins to FactSales[CustomerKey].
+	column CustomerKey
+		dataType: int64
+		isHidden
+		lineageTag: 5f5aff48-26c7-5f08-a365-4f277b81c32e
+		summarizeBy: none
+		sourceColumn: CustomerKey
+
+	/// Customer continent.
+	column Continent
+		dataType: string
+		lineageTag: 2c3f4b52-f4b1-5a13-82d8-aeb4c30584bc
+		sourceColumn: Continent
+
+	/// Customer gender.
+	column Gender
+		dataType: string
+		lineageTag: 973f155a-545f-5580-baa7-ffdc669e9aa7
+		sourceColumn: Gender
+
+	/// Customer city.
+	column City
+		dataType: string
+		lineageTag: 235dcda0-b26f-5232-bab0-b0ee694709af
+		sourceColumn: City
+
+	/// Customer state / province (abbreviation).
+	column State
+		dataType: string
+		lineageTag: f2d87d1c-c816-5db6-b403-6881271b4440
+		sourceColumn: State
+
+	/// Customer state / province (full name).
+	column StateFull
+		dataType: string
+		lineageTag: 0fc1aa16-6086-5c0e-827c-b3ef45719b6a
+		sourceColumn: StateFull
+
+	/// Postal / ZIP code.
+	column ZipCode
+		dataType: string
+		lineageTag: e8231d9b-66ae-512e-956f-bcddc1c21f76
+		sourceColumn: ZipCode
+
+	/// Customer country (short code / name).
+	column Country
+		dataType: string
+		lineageTag: 23ecedfe-7d01-525c-87b3-222c20641f1b
+		sourceColumn: Country
+
+	/// Customer country (full name).
+	column CountryFull
+		dataType: string
+		lineageTag: e60c58a5-9cff-5f23-b0cd-d2b15407ba12
+		sourceColumn: CountryFull
+
+	/// Date of birth.
+	column Birthday
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 7c384b76-f0a5-5151-94cc-a260e5773b0b
+		sourceColumn: Birthday
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	/// Customer age in years.
+	column Age
+		dataType: int64
+		lineageTag: bfae2b65-419f-56ca-a09d-4c52c164a742
+		summarizeBy: none
+		sourceColumn: Age
+
+	/// Customer age in ten-year marketing brackets (Under 25, 25-34 ... 65+).
+	column 'Age Band'
+		dataType: string
+		lineageTag: 5bf8cee8-0f8e-594b-bec9-a34010b5c227
+		summarizeBy: none
+		sourceColumn: Age Band
+		sortByColumn: 'Age Band Order'
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Sort order of Age Band. Hidden.
+	column 'Age Band Order'
+		dataType: int64
+		isHidden
+		lineageTag: e1c94170-3505-5b07-86b2-658948813440
+		summarizeBy: none
+		sourceColumn: Age Band Order
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Sort order of Customer Segment (1 High value ... 4 No sales), cut at the 80th and 50th percentile of lifetime sales among buyers. Hidden.
+	column 'Customer Segment Order'
+		dataType: int64
+		isHidden
+		lineageTag: a3fe8731-3b02-5916-9902-b69ac792fd01
+		summarizeBy: none
+		sourceColumn: Customer Segment Order
+
+	/// Value segment of the customer by lifetime net sales: High value is the top 20 % of buyers, Medium value the next 30 %, Low value the rest; No sales for customers without orders. Recomputed on every refresh (type 1).
+	column 'Customer Segment'
+		dataType: string
+		lineageTag: 501b55de-93c4-5afb-b704-9b441c6758f8
+		summarizeBy: none
+		sourceColumn: Customer Segment
+		sortByColumn: 'Customer Segment Order'
+
+	partition DimCustomer = m
+		mode: import
+		source =
+				let
+				    // the query the model already had, unchanged; what follows the ETL added (ADR 0036)
+				    #"Model query" =
+				        let
+				        	Source = Parquet.Document(Binary.Buffer(Web.Contents(DataBaseUrl, [RelativePath="DimCustomer.parquet"]))),
+				        	Typed = VEDAFXChangeType(Source, {{"Birthday", type date}, {"StartDT", type date}, {"EndDT", type date}})
+				        in
+				        	Typed,
+				    // the cut-offs of every band of the plan as data: [from, to), the first and last open
+				    #"Bandas" =
+				        let
+				            // one interval per row: analysis, from, to, label and order
+				            #"Band cut-offs" =
+				                #table(type table [#"Analysis" = text, #"From" = nullable number, #"To" = nullable number, #"Label" = text, #"Order" = Int64.Type], {
+				                    {"customer_age_band", null, 25, "Under 25", 1},
+				                    {"customer_age_band", 25, 35, "25-34", 2},
+				                    {"customer_age_band", 35, 45, "35-44", 3},
+				                    {"customer_age_band", 45, 55, "45-54", 4},
+				                    {"customer_age_band", 55, 65, "55-64", 5},
+				                    {"customer_age_band", 65, null, "65+", 6}
+				                })
+				        in
+				            #"Band cut-offs",
+				    // analysis column: the value in its band of the Bandas query, with its order for the model; an empty value lands in 'No data'
+				    #"Age Band by bands of Age" =
+				        let
+				            B = List.Buffer(Table.ToRecords(Table.SelectRows(#"Bandas", each [Analysis] = "customer_age_band"))),
+				            Find = (v) => List.First(List.Select(B, (b) => (b[From] = null or v >= b[From]) and (b[To] = null or v < b[To])), null),
+				            WithBand = Table.AddColumn(#"Model query", "__band", each let v = [Age] in
+				                if v <> null then (let b = Find(v) in [L = b[Label], O = b[Order]])
+				                else [L = "No data", O = 7]),
+				            WithLabel = Table.AddColumn(WithBand, "Age Band", each [__band][L], type text),
+				            WithOrder = Table.AddColumn(WithLabel, "Age Band Order", each [__band][O], Int64.Type)
+				        in
+				            Table.RemoveColumns(WithOrder, {"__band"}),
+				    // Customer Segment (Power Query, not DAX): lifetime net sales per customer from FactSalesSource, cut at the
+				    // 80th and 50th percentile of the buyers (PercentileMode.ExcelInc = PERCENTILEX.INC). Type 1: recomputed on every refresh.
+				    #"Lifetime sales" =
+				        let
+				            Lines = Table.SelectColumns(FactSalesSource, {"CustomerKey", "Quantity", "NetPrice"}),
+				            Amounts = Table.AddColumn(Lines, "Amount", each [Quantity] * [NetPrice], type number)
+				        in
+				            Table.Group(Amounts, {"CustomerKey"}, {{"LifetimeSales", each List.Sum([Amount]), type number}}),
+				    #"Segment cuts" = List.Percentile(List.Select(#"Lifetime sales"[LifetimeSales], each _ > 0), {0.5, 0.8}, [PercentileMode = PercentileMode.ExcelInc]),
+				    #"With lifetime sales" = Table.ExpandTableColumn(
+				        Table.NestedJoin(#"Age Band by bands of Age", {"CustomerKey"}, #"Lifetime sales", {"CustomerKey"}, "LS", JoinKind.LeftOuter), "LS", {"LifetimeSales"}),
+				    #"Customer Segment Order" = Table.AddColumn(#"With lifetime sales", "Customer Segment Order", each
+				        let s = [LifetimeSales] in if s = null or s <= 0 then 4 else if s >= #"Segment cuts"{1} then 1 else if s >= #"Segment cuts"{0} then 2 else 3, Int64.Type),
+				    #"Customer Segment" = Table.AddColumn(#"Customer Segment Order", "Customer Segment", each
+				        {"High value", "Medium value", "Low value", "No sales"}{[Customer Segment Order] - 1}, type text),
+				    #"Segment done" = Table.RemoveColumns(#"Customer Segment", {"LifetimeSales"}),
+				    // Columns no measure, relationship, report or meaning uses: removed here, upstream.
+				    #"Unused columns removed" = Table.RemoveColumns(#"Segment done", {"Title", "GivenName", "MiddleInitial", "Surname", "StreetAddress", "Occupation", "Company", "Vehicle", "StartDT", "EndDT", "Latitude", "Longitude", "GeoAreaKey"}),
+				    // English country names by Country code (the Parquet names are Spanish); a code not listed keeps its name
+				    #"English country names" =
+				        let
+				            Names = [MX = "Mexico", CO = "Colombia", AR = "Argentina", ES = "Spain", CL = "Chile", PE = "Peru", EC = "Ecuador"],
+				            T = #"Unused columns removed"
+				        in
+				            Table.FromRecords(Table.TransformRows(T, each _ & [CountryFull = Record.FieldOrDefault(Names, [Country], [CountryFull])]), Value.Type(T))
+				in
+				    #"English country names"
+

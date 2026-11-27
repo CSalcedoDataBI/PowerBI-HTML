@@ -1,0 +1,216 @@
+/// Fact table — one row per order line (grain: OrderKey + LineNumber). Central table of the star; join to dimensions on their *Key columns. Money columns are in the transaction currency (CurrencyCode).
+table FactSales
+	lineageTag: 4224e16b-1b5f-5ba3-8637-0227ba7cad3f
+
+	/// Order identifier (header). Many order lines can share one OrderKey; [Orders] counts distinct values.
+	column OrderKey
+		dataType: int64
+		lineageTag: 0afd7ab4-aa71-5ddc-afd7-197bcc6f514b
+		summarizeBy: none
+		sourceColumn: OrderKey
+
+	/// Line number within an order. OrderKey + LineNumber identify a single order line (the table grain).
+	column LineNumber
+		dataType: int64
+		lineageTag: 172f8fa7-30c6-513f-90f8-5980588cd1c9
+		summarizeBy: none
+		sourceColumn: LineNumber
+
+	/// Date the order was placed. Primary business date; related to DimDate[Date] for all time analysis.
+	column OrderDate
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: d9db84fe-a63e-596d-b723-6aa280ef8213
+		summarizeBy: none
+		sourceColumn: OrderDate
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	/// Date the order was delivered. Logistics only — do not use as the primary date for sales trends.
+	column DeliveryDate
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 0097fc86-8642-57ff-a969-af069128c012
+		summarizeBy: none
+		sourceColumn: DeliveryDate
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	/// Customer of the order. Joins to DimCustomer[CustomerKey].
+	column CustomerKey
+		dataType: int64
+		isHidden
+		lineageTag: 804eec7a-421f-57b3-afe3-2d022ba53452
+		summarizeBy: none
+		sourceColumn: CustomerKey
+
+	/// Store / channel of the sale. Joins to DimStore[StoreKey].
+	column StoreKey
+		dataType: int64
+		isHidden
+		lineageTag: d539fcbb-d1e7-5490-879b-acc1e92fa4dd
+		summarizeBy: none
+		sourceColumn: StoreKey
+
+	/// Product sold. Joins to DimProduct[ProductKey].
+	column ProductKey
+		dataType: int64
+		isHidden
+		lineageTag: e1713dc9-5c8e-53ea-bcdb-251ac2c13840
+		summarizeBy: none
+		sourceColumn: ProductKey
+
+	/// Sales channel of the order line (e.g., Store, Online).
+	column Channel
+		dataType: string
+		lineageTag: 36ac4ebe-fea7-5f10-b608-31cd4b5db498
+		summarizeBy: none
+		sourceColumn: Channel
+
+	/// Units sold on the order line. Summed by [Total Quantity].
+	column Quantity
+		dataType: int64
+		lineageTag: f52fd07f-6b26-5188-88fc-828c0a824267
+		summarizeBy: none
+		sourceColumn: Quantity
+
+	/// List price per unit before discounts, in transaction currency.
+	column UnitPrice
+		dataType: double
+		lineageTag: 07543793-9893-58a1-aac6-7945a1cf3078
+		summarizeBy: none
+		sourceColumn: UnitPrice
+
+	/// Actual price per unit after discounts, in transaction currency. Basis of [Total Sales].
+	column NetPrice
+		dataType: double
+		lineageTag: d941a76e-6197-53bb-967d-4ca88bfe8a25
+		summarizeBy: none
+		sourceColumn: NetPrice
+
+	/// Cost per unit, in transaction currency. Basis of [Total Cost].
+	column UnitCost
+		dataType: double
+		lineageTag: a34cd02b-4c2c-55e4-9481-93d1c605b04d
+		summarizeBy: none
+		sourceColumn: UnitCost
+
+	/// ISO currency code of the transaction amounts. Joins to DimCurrency[CurrencyCode].
+	column CurrencyCode
+		dataType: string
+		lineageTag: 4a51408c-127f-51fc-8964-8d72aafe8c45
+		summarizeBy: none
+		sourceColumn: CurrencyCode
+
+	/// Net amount of the line in US dollars (quantity x net price, converted with the exchange rate of the sale date). Adds up across countries.
+	column 'Net Amount USD'
+		dataType: decimal
+		formatString: \$#,0.00
+		lineageTag: 73e470de-ca83-5fd4-ae73-657849eacbb3
+		summarizeBy: sum
+		sourceColumn: Net Amount USD
+
+	/// Days from the order date to the delivery date of the line. Zero for store sales.
+	column 'Delivery Days'
+		dataType: int64
+		lineageTag: f0f53eda-6eb6-53d5-80be-ec1f82ab7100
+		summarizeBy: none
+		sourceColumn: Delivery Days
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Delivery days in bands (Same day, 1-3 days, 4-7 days, 8+ days) to see where the wait concentrates.
+	column 'Delivery Band'
+		dataType: string
+		lineageTag: 1b13e742-f3ee-508f-a380-87b82e1c0b2e
+		summarizeBy: none
+		sourceColumn: Delivery Band
+		sortByColumn: 'Delivery Band Order'
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Sort order of Delivery Band. Hidden.
+	column 'Delivery Band Order'
+		dataType: int64
+		isHidden
+		lineageTag: 2b4c818b-252c-5db7-b9d1-7195a6d0681c
+		summarizeBy: none
+		sourceColumn: Delivery Band Order
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Yes when the line was delivered more than seven days after the order (the delivery window until the business sets one).
+	column 'Late Delivery'
+		dataType: string
+		lineageTag: 7bade4d0-b2de-52e5-9160-4483c9c9831d
+		summarizeBy: none
+		sourceColumn: Late Delivery
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Yes when the line was sold below its list price.
+	column Discounted
+		dataType: string
+		lineageTag: ce7f99bb-c361-5459-88a1-e85301575788
+		summarizeBy: none
+		sourceColumn: Discounted
+
+		annotation SummarizationSetBy = Automatic
+
+	partition FactSales = m
+		mode: import
+		source =
+				let
+				    // the query the model already had, unchanged; what follows the ETL added (ADR 0036)
+				    #"Model query" =
+				        let
+				        	Source = FactSalesSource,
+				        	Typed = Table.TransformColumnTypes(Source, {{"OrderDate", type date}, {"DeliveryDate", type date}}, "en-US"),
+				        	// Net Amount USD: the line's amount in its currency divided by the USD rate of the order date
+				        	// (DimCurrencyExchange holds USD -> currency rates, one per day).
+				        	Rates = Table.TransformColumnTypes(Table.SelectRows(Parquet.Document(Binary.Buffer(Web.Contents(DataBaseUrl, [RelativePath="DimCurrencyExchange.parquet"]))), each [FromCurrency] = "USD"), {{"Date", type date}}, "en-US"),
+				        	WithRate = Table.NestedJoin(Typed, {"OrderDate", "CurrencyCode"}, Rates, {"Date", "ToCurrency"}, "UsdRate", JoinKind.LeftOuter),
+				        	RateColumn = Table.ExpandTableColumn(WithRate, "UsdRate", {"Exchange"}, {"UsdRate"}),
+				        	NetAmountUsd = Table.AddColumn(RateColumn, "Net Amount USD", each if [UsdRate] = null or [UsdRate] = 0 then null else Number.Round([Quantity] * [NetPrice] / [UsdRate], 4), Currency.Type),
+				        	Converted = Table.RemoveColumns(NetAmountUsd, {"UsdRate"})
+				        in
+				        	Converted,
+				    // the cut-offs of every band of the plan as data: [from, to), the first and last open
+				    #"Bandas" =
+				        let
+				            // one interval per row: analysis, from, to, label and order
+				            #"Band cut-offs" =
+				                #table(type table [#"Analysis" = text, #"From" = nullable number, #"To" = nullable number, #"Label" = text, #"Order" = Int64.Type], {
+				                    {"delivery_band", null, 1, "Same day", 1},
+				                    {"delivery_band", 1, 4, "1-3 days", 2},
+				                    {"delivery_band", 4, 8, "4-7 days", 3},
+				                    {"delivery_band", 8, null, "8+ days", 4}
+				                })
+				        in
+				            #"Band cut-offs",
+				    // analysis column: time between two milestones, whole. Empty end = a process in progress (empty, no problem); end before start = empty and flagged in DI_Problema, so it never lands in the lowest band (ADR 0033)
+				    #"Delivery Days = DeliveryDate − OrderDate (days)" =
+				        Table.AddColumn(#"Model query", "Delivery Days", each let d = if [OrderDate] = null or [DeliveryDate] = null then null else Duration.Days(Date.From([DeliveryDate]) - Date.From([OrderDate])) in if d = null or d < 0 then null else d, Int64.Type),
+				    // analysis column: the value in its band of the Bandas query, with its order for the model; an empty value lands in 'No data' and a process without end in 'In progress'
+				    #"Delivery Band by bands of Delivery Days" =
+				        let
+				            B = List.Buffer(Table.ToRecords(Table.SelectRows(#"Bandas", each [Analysis] = "delivery_band"))),
+				            Find = (v) => List.First(List.Select(B, (b) => (b[From] = null or v >= b[From]) and (b[To] = null or v < b[To])), null),
+				            WithBand = Table.AddColumn(#"Delivery Days = DeliveryDate − OrderDate (days)", "__band", each let v = [#"Delivery Days"] in
+				                if v <> null then (let b = Find(v) in [L = b[Label], O = b[Order]])
+				                else if [DeliveryDate] = null and [OrderDate] <> null then [L = "In progress", O = 5] else [L = "No data", O = 6]),
+				            WithLabel = Table.AddColumn(WithBand, "Delivery Band", each [__band][L], type text),
+				            WithOrder = Table.AddColumn(WithLabel, "Delivery Band Order", each [__band][O], Int64.Type)
+				        in
+				            Table.RemoveColumns(WithOrder, {"__band"}),
+				    // analysis column: a readable flag, not 1/0; an empty value lands in 'No data'
+				    #"Late Delivery by Delivery Days" =
+				        Table.AddColumn(#"Delivery Band by bands of Delivery Days", "Late Delivery", each if [#"Delivery Days"] = null then "No data" else if [#"Delivery Days"] > 7 then "Yes" else "No", type text),
+				    // analysis column: a readable flag, not 1/0; an empty value lands in 'No data'
+				    #"Discounted by NetPrice" =
+				        Table.AddColumn(#"Late Delivery by Delivery Days", "Discounted", each if [NetPrice] = null or [UnitPrice] = null then "No data" else if [NetPrice] < [UnitPrice] then "Yes" else "No", type text),
+				    // Columns no measure, relationship, report or meaning uses: removed here, upstream.
+				    #"Unused columns removed" = Table.RemoveColumns(#"Discounted by NetPrice", {"ExchangeRate"})
+				in
+				    #"Unused columns removed"
+
